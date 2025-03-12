@@ -66,14 +66,14 @@
             justify-content: space-around;
         }
         .control-button {
-            width: 60px;
-            height: 60px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             background-color: rgba(255, 255, 255, 0.5);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 20px;
             cursor: pointer;
             touch-action: none;
         }
@@ -134,7 +134,7 @@
             y: canvas.height - 100,
             width: 60,
             height: 80,
-            speed: 12 // Increased player speed
+            speed: 15 // Increased player speed
         };
 
         let chaser = {
@@ -310,23 +310,31 @@
             cancelAnimationFrame(gameLoopId);
             document.getElementById("gameOverScreen").style.display = "flex";
             document.getElementById("gameOverMessage").textContent = isWin ? "You Win!" : "Game Over!";
+            
             const imgContainer = document.createElement("div");
             imgContainer.style.margin = "20px 0";
-    
+            
             const endImage = new Image();
-            endImage.src = isWin ? "https://i.imgur.com/OjInj0Q.png" : chaserImage.src; 
-            endImage.style.width = "150px"; // Adjust size as needed
+            if (isWin) {
+                // Array of winning images including the new ones
+                const winImages = [
+                    "https://i.imgur.com/OjInj0Q.png",
+                    "https://i.imgur.com/9DLOW84.png",
+                    "https://i.imgur.com/o83HwYm.png",
+                    "https://i.imgur.com/BfyMQMc.png"
+                ];
+                
+                // Randomly select a winning image
+                const randomIndex = Math.floor(Math.random() * winImages.length);
+                endImage.src = winImages[randomIndex];
+            } else {
+                endImage.src = chaserImage.src;
+            }
+            endImage.style.width = "150px";
             endImage.style.height = "150px";
-    
+            
             imgContainer.appendChild(endImage);
             document.getElementById("gameOverScreen").appendChild(imgContainer);
-            // Show chaser image on lose
-            if (!isWin) {
-                const imgContainer = document.createElement("div");
-                imgContainer.style.margin = "20px 0";
-                imgContainer.appendChild(chaserImage);
-                document.getElementById("gameOverScreen").appendChild(imgContainer);
-            }
         }
 
         // Restart game function
@@ -340,4 +348,5 @@
         }
     </script>
 </body>
+</html>
 </html>
