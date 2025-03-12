@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collect KARLA Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #87CEEB, #1E90FF);
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100vh;
+            margin: 0 auto;
+        }
+        #gameUI {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+        #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            display: none;
+        }
+        #gameOverScreen h1 {
+            font-size: 60px;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 5px rgba(0, 0, 0, 0.5);
+        }
+        #gameOverScreen button {
+            padding: 15px 30px;
+            font-size: 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        #gameOverScreen button:hover {
+            background-color: #45a049;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+        }
+        .control-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameUI">
+        <div>Collected: <span id="collectedLetters"></span></div>
+    </div>
+    <div id="gameOverScreen">
+        <h1 id="gameOverMessage"></h1>
+        <button id="restartButton">Play Again</button>
+    </div>
+    <div id="controls">
+        <div class="control-button" id="leftButton">&#8592;</div>
+        <div class="control-button" id="rightButton">&#8594;</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        // Make canvas responsive
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Load game images
+        const playerImage = new Image();
+        playerImage.src = "https://i.imgur.com/Hdq7gMf.png";
+
+        const chaserImage = new Image();
+        chaserImage.src = "https://i.imgur.com/MhdsqU5.png";
+
+        const coinImage = new Image();
+        coinImage.src = "https://i.imgur.com/OjInj0Q.png";
+
+        let imagesLoaded = 0;
+        const totalImages = 3;
+
+        function imageLoaded() {
+            imagesLoaded++;
+            if (imagesLoaded === totalImages) {
+                startGame();
+            }
+        }
+
+        playerImage.onload = imageLoaded;
+        chaserImage.onload = imageLoaded;
+        coinImage.onload = imageLoaded;
+
+        let player = {
+            x: canvas.width / 2,
+            y: canvas.height - 100,
+            width: 60,
+            height: 80,
+            speed: 12 // Increased player speed
+        };
+
+        let chaser = {
+            x: canvas.width / 2,
+            y: 50,
+            width: 80,
+            height: 100,
+            speed: 2,
+            throwCooldown: 0
+        };
+
+        let collectibles = [];
+        let obstacles = [];
+        let collectedLetters = [];
+        let gameOver = false;
+        let gameLoopId;
+
+        // Initialize collectibles
+        function spawnCollectible() {
+            const letters = ["K", "A", "R", "L", "A"];
+            const randomLetter = letters[Math.floor(Math.random() * letters.length)];
+            
+            collectibles.push({
+                x: Math.random() * (canvas.width - 80) + 40,
+                y: 0,
+                letter: randomLetter,
+                speed: 3 + Math.random() * 2
+            });
+        }
+
+        // Set up initial collectibles
+        setInterval(spawnCollectible, 1500);
+
+        // Keyboard controls
+        document.addEventListener("keydown", (event) => {
+            if (gameOver) return;
+
+            switch(event.key) {
+                case "ArrowLeft":
+                    player.x = Math.max(0, player.x - player.speed);
+                    break;
+                case "ArrowRight":
+                    player.x = Math.min(canvas.width - player.width, player.x + player.speed);
+                    break;
+            }
+        });
+
+        // Touch controls
+        document.getElementById("leftButton").addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            player.x = Math.max(0, player.x - player.speed);
+        });
+
+        document.getElementById("rightButton").addEventListener("touchstart", (event) => {
+            event.preventDefault();
+            player.x = Math.min(canvas.width - player.width, player.x + player.speed);
+        });
+
+        // Update chaser and obstacles
+        function updateGame() {
+            // Move chaser back and forth
+            chaser.x += chaser.speed;
+            if (chaser.x <= 0 || chaser.x >= canvas.width - chaser.width) {
+                chaser.speed = -chaser.speed;
+            }
+
+            // Chaser throws obstacles
+            chaser.throwCooldown--;
+            if (chaser.throwCooldown <= 0) {
+                obstacles.push({
+                    x: chaser.x + chaser.width/2 - 25,
+                    y: chaser.y + chaser.height,
+                    width: 50,
+                    height: 50,
+                    speed: 3 + Math.random() * 2 // Reduced obstacle speed
+                });
+                chaser.throwCooldown = 60 + Math.floor(Math.random() * 40);
+            }
+
+            // Update obstacles
+            obstacles.forEach((obstacle, index) => {
+                obstacle.y += obstacle.speed;
+                
+                // Check collision
+                if (player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y) {
+                    endGame(false);
+                }
+                
+                // Remove if off screen
+                if (obstacle.y > canvas.height) {
+                    obstacles.splice(index, 1);
+                }
+            });
+
+            // Update collectibles
+            collectibles.forEach((item, index) => {
+                item.y += item.speed;
+                
+                // Check if collected
+                if (Math.abs(player.x - item.x) < 40 && 
+                    Math.abs(player.y - item.y) < 40) {
+                    
+                    collectedLetters.push(item.letter);
+                    collectibles.splice(index, 1);
+                    
+                    // Check win condition
+                    if (collectedLetters.includes("K") && 
+                        collectedLetters.includes("A") && 
+                        collectedLetters.includes("R") && 
+                        collectedLetters.includes("L") && 
+                        collectedLetters.includes("A")) {
+                        endGame(true);
+                    }
+                }
+                
+                // Remove if off screen
+                if (item.y > canvas.height) {
+                    collectibles.splice(index, 1);
+                }
+            });
+        }
+
+        // Draw game elements
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw background
+            ctx.fillStyle = "#87CEEB";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ground
+            ctx.fillStyle = "#8B4513";
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+
+            // Draw chaser
+            ctx.drawImage(chaserImage, chaser.x, chaser.y, chaser.width, chaser.height);
+
+            // Draw player
+            ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+
+            // Draw collectibles
+            collectibles.forEach(item => {
+                ctx.fillStyle = "gold";
+                ctx.font = "30px Arial";
+                ctx.fillText(item.letter, item.x, item.y + 25);
+            });
+
+            // Draw obstacles
+            obstacles.forEach(obstacle => {
+                ctx.fillStyle = "red";
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+
+            // Update UI
+            document.getElementById("collectedLetters").textContent = collectedLetters.join(" ");
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (!gameOver) {
+                updateGame();
+                draw();
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // End game function
+        function endGame(isWin) {
+            gameOver = true;
+            cancelAnimationFrame(gameLoopId);
+            document.getElementById("gameOverScreen").style.display = "flex";
+            document.getElementById("gameOverMessage").textContent = isWin ? "You Win!" : "Game Over!";
+            const imgContainer = document.createElement("div");
+            imgContainer.style.margin = "20px 0";
+    
+            const endImage = new Image();
+            endImage.src = isWin ? "https://i.imgur.com/OjInj0Q.png" : chaserImage.src; 
+            endImage.style.width = "150px"; // Adjust size as needed
+            endImage.style.height = "150px";
+    
+            imgContainer.appendChild(endImage);
+            document.getElementById("gameOverScreen").appendChild(imgContainer);
+            // Show chaser image on lose
+            if (!isWin) {
+                const imgContainer = document.createElement("div");
+                imgContainer.style.margin = "20px 0";
+                imgContainer.appendChild(chaserImage);
+                document.getElementById("gameOverScreen").appendChild(imgContainer);
+            }
+        }
+
+        // Restart game function
+        document.getElementById("restartButton").addEventListener("click", () => {
+            location.reload();
+        });
+
+        // Start the game after images load
+        function startGame() {
+            gameLoop();
+        }
+    </script>
+</body>
+</html>
